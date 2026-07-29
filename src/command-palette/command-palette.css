@@ -1,0 +1,335 @@
+/* Theming works through `--cp-*` custom properties, each with a literal fallback.
+ * The palette looks right out of the box – and adopts the host theme as soon as
+ * it maps its own tokens:
+ *
+ *   :root {
+ *     --cp-bg: var(--my-surface);
+ *     --cp-accent: var(--my-brand);
+ *   }
+ *
+ * Deliberately not reading generic names like `--bg` directly: in a host project
+ * those usually mean something else. */
+
+/* Standard technique: taken out of the layout but kept in the accessibility tree.
+   `display: none` or `visibility: hidden` would mute the live regions. */
+.cp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cp-dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: 60vh;
+  padding: 0;
+  margin: 12vh auto auto;
+  border: 1px solid var(--cp-border, #e5e4e7);
+  border-radius: 12px;
+  background: var(--cp-bg, #fff);
+  color: var(--cp-text, #6b6375);
+  box-shadow: var(
+    --cp-shadow,
+    rgb(0 0 0 / 10%) 0 10px 15px -3px,
+    rgb(0 0 0 / 5%) 0 4px 6px -2px
+  );
+  font: inherit;
+  /* The dialog is only the frame – scrolling belongs to the list alone. Without
+     this, `overflow: auto` from the browser stylesheet applies and the dialog
+     brings a second scrollbar along. */
+  overflow: hidden;
+
+  /* Closed state — and the *exit* timing. A transition is governed by the rule for
+     the state the element moves into, so leaving is defined here and entering on
+     `[open]`. That is what lets the two have different curves.
+
+     Exits are short and accelerate away (ease-in): a UI that lingers on dismissal
+     feels sluggish. `display` and `overlay` need `allow-discrete`, otherwise the
+     browser flips them instantly and there is nothing left to animate. */
+  opacity: 0;
+  scale: 0.97;
+  translate: 0 -10px;
+  transition:
+    opacity 150ms cubic-bezier(0.4, 0, 1, 1),
+    scale 150ms cubic-bezier(0.4, 0, 1, 1),
+    translate 150ms cubic-bezier(0.4, 0, 1, 1),
+    display 150ms allow-discrete,
+    overlay 150ms allow-discrete;
+}
+
+/* Only while open, otherwise `display` overrides the browser's `display: none` and
+   the dialog sits in the layout permanently.
+
+   Entering is slower and settles rather than stopping: the steep ease-out spends
+   most of the time near the end, which is what reads as fluid. */
+.cp-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  scale: 1;
+  translate: 0 0;
+  transition:
+    opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    scale 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    display 260ms allow-discrete,
+    overlay 260ms allow-discrete;
+}
+
+/* Without a declared starting point there is nothing to animate *from* when the
+   element enters the top layer. Browsers without support simply show it at once. */
+@starting-style {
+  .cp-dialog[open] {
+    opacity: 0;
+    scale: 0.97;
+    translate: 0 -10px;
+  }
+}
+
+/* Light theme by default, dark below. The literal fallbacks matter: whether
+   `::backdrop` inherits custom properties from the dialog differs between browsers,
+   so `--cp-backdrop` must not be the only source. */
+.cp-dialog::backdrop {
+  background: var(--cp-backdrop, rgb(240 240 246 / 55%));
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  opacity: 0;
+  transition:
+    opacity 130ms cubic-bezier(0.4, 0, 1, 1),
+    display 130ms allow-discrete,
+    overlay 130ms allow-discrete;
+}
+
+/* Slightly ahead of the dialog on the way in, so the panel lands on a scrim that is
+   already there. Fading an element that carries `backdrop-filter` means recompositing
+   the blur every frame – the shortest duration that still reads as a fade is the
+   cheapest one. */
+.cp-dialog[open]::backdrop {
+  opacity: 1;
+  transition:
+    opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    display 200ms allow-discrete,
+    overlay 200ms allow-discrete;
+}
+
+@starting-style {
+  .cp-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .cp-dialog::backdrop {
+    background: var(--cp-backdrop, rgb(8 8 12 / 60%));
+  }
+}
+
+/* Some users switch off translucency at the OS level – honour that and fall back to
+   an opaque scrim instead of blur. */
+@media (prefers-reduced-transparency: reduce) {
+  .cp-dialog::backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--cp-backdrop, rgb(240 240 246 / 94%));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
+  .cp-dialog::backdrop {
+    background: var(--cp-backdrop, rgb(8 8 12 / 94%));
+  }
+}
+
+.cp-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  /* Without this the flex container keeps its content size and pushes the list past
+     the dialog edge instead of letting it shrink. */
+  min-height: 0;
+  text-align: start;
+}
+
+.cp-breadcrumb {
+  flex: 0 0 auto;
+  padding: 8px 16px 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.cp-input {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--cp-border, #e5e4e7);
+  background: transparent;
+  color: var(--cp-text-strong, #08060d);
+  font: inherit;
+  font-size: 17px;
+}
+
+.cp-input:focus {
+  outline: none; /* Focus is unambiguous inside the dialog; the list carries the cue. */
+}
+
+/* The palette's only scroll container. */
+.cp-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Don't chain past the end of the list into the page behind. */
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+
+.cp-option {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: default;
+}
+
+/* Level changes only. React gives every row a fresh DOM node when the level changes
+   (the keys are path based), so the animation restarts on its own – even on two
+   submenu entries in a row. While typing the class is absent, so filtering does not
+   twitch on every keystroke.
+
+   Deliberately no animation on the listbox itself: it carries the option ids and
+   `aria-activedescendant`, and rebuilding that node would put the announcements at
+   risk for the sake of decoration. */
+@keyframes cp-option-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+/* `backwards` is not optional: the rows carry a staggered `animation-delay`, and
+   without it they would sit fully visible during the delay and then snap to
+   transparent when the animation starts. The stagger is capped in JS so a long list
+   does not cascade for half a second. */
+.cp-option--enter {
+  animation: cp-option-in 190ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* The active option is not focused (focus stays in the input), so it needs its own
+   clearly visible marking. A border rather than background alone, so it stays
+   recognisable in high contrast mode. */
+.cp-option--active {
+  background: var(--cp-accent-bg, rgb(170 59 255 / 10%));
+  box-shadow: inset 0 0 0 2px var(--cp-accent-border, rgb(170 59 255 / 50%));
+  color: var(--cp-text-strong, #08060d);
+}
+
+.cp-option--disabled {
+  opacity: 0.45;
+}
+
+/* Fixed slot so labels line up whether or not an entry has an icon.
+   `currentColor` inside the SVG makes it follow the theme and the active state. */
+.cp-option__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+}
+
+.cp-option__icon > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cp-option--active .cp-option__icon {
+  opacity: 1;
+}
+
+.cp-option__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.cp-option__label {
+  color: var(--cp-text-strong, #08060d);
+}
+
+.cp-match {
+  color: var(--cp-accent, #aa3bff);
+  font-weight: 600;
+}
+
+.cp-trail {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.cp-option__hint {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.cp-kbd {
+  padding: 2px 7px;
+  border: 1px solid var(--cp-border, #e5e4e7);
+  border-radius: 5px;
+  background: var(--cp-surface, #f4f3ec);
+  color: var(--cp-text-strong, #08060d);
+  font-family: var(--cp-mono, ui-monospace, Consolas, monospace);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cp-chevron {
+  opacity: 0.6;
+}
+
+.cp-empty {
+  padding: 20px 16px;
+  font-size: 15px;
+  text-align: center;
+}
+
+/* Replaces the former sr-only help referenced via aria-describedby: that got read
+   out on every re-announcement of the input. Visible in the panel it bothers
+   nobody and stays discoverable for screen reader users. */
+.cp-footer {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border-top: 1px solid var(--cp-border, #e5e4e7);
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cp-list {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Everything above is decoration – switching it off leaves the palette fully usable,
+   it just appears and disappears instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .cp-dialog,
+  .cp-dialog::backdrop {
+    transition: none;
+  }
+
+  .cp-option--enter {
+    animation: none;
+  }
+}
