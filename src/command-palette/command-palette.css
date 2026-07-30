@@ -24,41 +24,39 @@
   border: 0;
 }
 
+/* Full-screen overlay. The backdrop-filter is applied directly to the <dialog>
+   element instead of ::backdrop so that it works in all browsers, including
+   Firefox which only gained backdrop-filter on ::backdrop in v122 and still has
+   gaps in some builds. Clicks on the transparent area outside the panel reach
+   the dialog element itself and are handled by the onClick guard in JSX.
+
+   Closed state – and the *exit* timing. A transition is governed by the rule for
+   the state the element moves into, so leaving is defined here and entering on
+   `[open]`. That is what lets the two have different curves.
+
+   Exits are short and accelerate away (ease-in): a UI that lingers on dismissal
+   feels sluggish. `display` and `overlay` need `allow-discrete`, otherwise the
+   browser flips them instantly and there is nothing left to animate. */
 .cp-dialog {
   box-sizing: border-box;
-  width: min(640px, calc(100vw - 32px));
-  max-height: 60vh;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
   padding: 0;
-  margin: 12vh auto auto;
-  border: 1px solid var(--cp-border, #e5e4e7);
-  border-radius: 12px;
-  background: var(--cp-bg, #fff);
+  margin: 0;
+  border: none;
+  background: var(--cp-backdrop, rgb(240 240 246 / 55%));
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
   color: var(--cp-text, #6b6375);
-  box-shadow: var(
-    --cp-shadow,
-    rgb(0 0 0 / 10%) 0 10px 15px -3px,
-    rgb(0 0 0 / 5%) 0 4px 6px -2px
-  );
   font: inherit;
-  /* The dialog is only the frame – scrolling belongs to the list alone. Without
-     this, `overflow: auto` from the browser stylesheet applies and the dialog
-     brings a second scrollbar along. */
-  overflow: hidden;
 
-  /* Closed state — and the *exit* timing. A transition is governed by the rule for
-     the state the element moves into, so leaving is defined here and entering on
-     `[open]`. That is what lets the two have different curves.
-
-     Exits are short and accelerate away (ease-in): a UI that lingers on dismissal
-     feels sluggish. `display` and `overlay` need `allow-discrete`, otherwise the
-     browser flips them instantly and there is nothing left to animate. */
   opacity: 0;
-  scale: 0.97;
-  translate: 0 -10px;
   transition:
     opacity 150ms cubic-bezier(0.4, 0, 1, 1),
-    scale 150ms cubic-bezier(0.4, 0, 1, 1),
-    translate 150ms cubic-bezier(0.4, 0, 1, 1),
     display 150ms allow-discrete,
     overlay 150ms allow-discrete;
 }
@@ -71,46 +69,7 @@
 .cp-dialog[open] {
   display: flex;
   flex-direction: column;
-  opacity: 1;
-  scale: 1;
-  translate: 0 0;
-  transition:
-    opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
-    scale 260ms cubic-bezier(0.16, 1, 0.3, 1),
-    translate 260ms cubic-bezier(0.16, 1, 0.3, 1),
-    display 260ms allow-discrete,
-    overlay 260ms allow-discrete;
-}
-
-/* Without a declared starting point there is nothing to animate *from* when the
-   element enters the top layer. Browsers without support simply show it at once. */
-@starting-style {
-  .cp-dialog[open] {
-    opacity: 0;
-    scale: 0.97;
-    translate: 0 -10px;
-  }
-}
-
-/* Light theme by default, dark below. The literal fallbacks matter: whether
-   `::backdrop` inherits custom properties from the dialog differs between browsers,
-   so `--cp-backdrop` must not be the only source. */
-.cp-dialog::backdrop {
-  background: var(--cp-backdrop, rgb(240 240 246 / 55%));
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  opacity: 0;
-  transition:
-    opacity 130ms cubic-bezier(0.4, 0, 1, 1),
-    display 130ms allow-discrete,
-    overlay 130ms allow-discrete;
-}
-
-/* Slightly ahead of the dialog on the way in, so the panel lands on a scrim that is
-   already there. Fading an element that carries `backdrop-filter` means recompositing
-   the blur every frame – the shortest duration that still reads as a fade is the
-   cheapest one. */
-.cp-dialog[open]::backdrop {
+  align-items: center;
   opacity: 1;
   transition:
     opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -118,14 +77,22 @@
     overlay 200ms allow-discrete;
 }
 
+/* Without a declared starting point there is nothing to animate *from* when the
+   element enters the top layer. Browsers without support simply show it at once. */
 @starting-style {
-  .cp-dialog[open]::backdrop {
+  .cp-dialog[open] {
     opacity: 0;
   }
 }
 
+/* The native ::backdrop is still created by showModal() but is no longer needed
+   for the blur – keep it transparent so it does not double-up the tint. */
+.cp-dialog::backdrop {
+  background: transparent;
+}
+
 @media (prefers-color-scheme: dark) {
-  .cp-dialog::backdrop {
+  .cp-dialog {
     background: var(--cp-backdrop, rgb(8 8 12 / 60%));
   }
 }
@@ -133,7 +100,7 @@
 /* Some users switch off translucency at the OS level – honour that and fall back to
    an opaque scrim instead of blur. */
 @media (prefers-reduced-transparency: reduce) {
-  .cp-dialog::backdrop {
+  .cp-dialog {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--cp-backdrop, rgb(240 240 246 / 94%));
@@ -141,19 +108,58 @@
 }
 
 @media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-  .cp-dialog::backdrop {
+  .cp-dialog {
     background: var(--cp-backdrop, rgb(8 8 12 / 94%));
   }
 }
 
+/* The visible panel box. Previously the <dialog> itself was sized as the panel;
+   now it is a child so that the dialog can be full-screen. */
 .cp-panel {
+  box-sizing: border-box;
+  flex: 0 1 auto;
+  width: min(640px, calc(100vw - 32px));
+  max-height: 60vh;
+  padding: 0;
+  margin: 12vh auto 0;
+  border: 1px solid var(--cp-border, #e5e4e7);
+  border-radius: 12px;
+  background: var(--cp-bg, #fff);
+  color: var(--cp-text, #6b6375);
+  box-shadow: var(
+    --cp-shadow,
+    rgb(0 0 0 / 10%) 0 10px 15px -3px,
+    rgb(0 0 0 / 5%) 0 4px 6px -2px
+  );
+  overflow: hidden;
+
+  /* Internal layout */
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  /* Without this the flex container keeps its content size and pushes the list past
-     the dialog edge instead of letting it shrink. */
   min-height: 0;
   text-align: start;
+
+  /* Closed state / exit animation for the panel box itself. */
+  scale: 0.97;
+  translate: 0 -10px;
+  transition:
+    scale 150ms cubic-bezier(0.4, 0, 1, 1),
+    translate 150ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+.cp-dialog[open] .cp-panel {
+  scale: 1;
+  translate: 0 0;
+  transition:
+    scale 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@starting-style {
+  .cp-dialog[open] .cp-panel {
+    scale: 0.97;
+    translate: 0 -10px;
+  }
 }
 
 .cp-breadcrumb {
@@ -325,7 +331,7 @@
    it just appears and disappears instantly. */
 @media (prefers-reduced-motion: reduce) {
   .cp-dialog,
-  .cp-dialog::backdrop {
+  .cp-panel {
     transition: none;
   }
 
