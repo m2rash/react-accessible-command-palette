@@ -167,10 +167,15 @@
   outline: none; /* Focus is unambiguous inside the dialog; the list carries the cue. */
 }
 
-/* The palette's only scroll container. */
+/* The palette's only scroll container.
+ *
+ * `min-height` is a floor, not decoration: input and footer above and below cannot
+ * shrink, so without it the list is the one that gives way and collapses to zero at
+ * high zoom. Roughly one option row — enough that the first entry stays readable even
+ * when the footer has to be clipped for it. */
 .cp-list {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 3rem;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 6px;
@@ -289,6 +294,39 @@
   border-top: 1px solid var(--cp-border, #e5e4e7);
   font-size: 12px;
   opacity: 0.75;
+}
+
+/* High zoom and short windows. Two things go wrong there: the 12vh offset plus the
+   60vh cap leave 28vh of the viewport unused, and the footer wraps to a paragraph that
+   no longer fits next to the list.
+
+   So reclaim the height and let the panel scroll instead of the list. Still exactly one
+   scroll container, because the list hands its own off — and nothing is lost, the
+   footer stays reachable rather than being cut off.
+
+   Triggering this too early is harmless: the panel is sized by its content and only
+   scrolls once that content really exceeds the viewport. */
+@media (max-height: 520px) {
+  .cp-panel {
+    max-height: calc(100dvh - 16px);
+    margin: 8px auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .cp-list {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-y: visible;
+  }
+
+  /* Keeps the search field in view while the panel scrolls. Needs an opaque background
+     — the base rule is transparent and the options would show through. */
+  .cp-input {
+    position: sticky;
+    top: 0;
+    background: var(--cp-bg, #fff);
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

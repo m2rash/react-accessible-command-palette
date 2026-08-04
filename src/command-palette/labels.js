@@ -32,9 +32,9 @@ export const defaultLabels = {
 
   /** Visible below the list and, on open, spoken last by screen reader. Keep it short enough to hear. */
   footerRoot:
-    'Type anytime to search all commands including submenus. Arrow keys navigate, Enter runs or opens a submenu. Escape closes.',
+    'Textsearch is everywhere available to search/filter all commands. Use arrow keys to navigate the list, Enter runs commands or opens a submenu. Escape closes.',
   footerSubmenu:
-    'Type anytime to search this submenu and everything below it. Arrow keys navigate, Enter runs. Backspace in an empty search field goes back one level, Escape closes.',
+    'Textsearch is everywhere available to search/filter this submenu. Use arrow keys to navigate the list, Enter runs commands. Use backspace to go back, Escape closes.',
 
   // Parts of an entry's accessible name. The separating ", " is added by the caller.
   inTrail: (trail) => `in ${trail.join(', ')}`,
