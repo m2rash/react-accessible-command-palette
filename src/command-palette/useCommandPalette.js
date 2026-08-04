@@ -6,11 +6,15 @@ import { useAnnouncer } from './useAnnouncer'
 
 const PAGE_SIZE = 10
 
-// How long to wait before an announcement goes out.
 const ANNOUNCE_DELAY = {
   query: 180, // typing: otherwise one announcement queues up per keystroke
   items: 500, // external changes: more generous, they arrive unrequested
 }
+
+// Long enough that the live region is registered before it is written to — a region
+// written in the same beat as its insertion gets swallowed. Overshooting costs nothing:
+// a polite region queues, so the help lands after the opening announcement either way.
+const INTRO_DELAY = 600
 
 export function hasChildren(item) {
   return Array.isArray(item?.children) && item.children.length > 0
@@ -23,12 +27,11 @@ export function childCount(item) {
 /**
  * Flattens the tree below `items`.
  *
- * The `key` is the composed path, **not** the item id: the same command ("Save")
- * can live in several submenus, and the entire re-announcement mechanism via
- * `aria-activedescendant` depends on unique, stable keys. Item ids must therefore
- * not contain a `/`.
+ * `key` is the composed path, not the item id — the same command can live in
+ * several submenus, and `aria-activedescendant` needs unique, stable keys.
+ * Item ids must therefore not contain a `/`.
  *
- * `trail` holds the ancestors' labels – the user needs those to place a match.
+ * @returns {Array<{key: string, item: object, path: string[], trail: string[], depth: number}>}
  */
 function flatten(items, path = [], trail = [], depth = 0, out = []) {
   for (const item of items) {
@@ -41,7 +44,7 @@ function flatten(items, path = [], trail = [], depth = 0, out = []) {
   return out
 }
 
-/** Builds the spoken text for an entry – same order as in the DOM. */
+/** Spoken text for an entry — same order as the DOM. */
 function describeEntry(entry, labels) {
   if (!entry) return ''
 
@@ -60,8 +63,7 @@ function describeEntry(entry, labels) {
 /**
  * Walks a path of item ids from the root downwards.
  *
- * @returns {{items: Array, label: string}|null} `null` when the path no longer
- *   exists – for instance because the submenu has meanwhile vanished from the data.
+ * @returns {{items: Array, label: string}|null} `null` when the path no longer exists.
  */
 function resolveLevel(rootItems, path, rootLabel) {
   let items = rootItems
@@ -78,29 +80,18 @@ function resolveLevel(rootItems, path, rootLabel) {
 }
 
 /**
- * The palette's entire state: level stack, filtering, active element and the screen
- * reader announcements derived from them.
+ * Level stack, filtering, active entry and the screen reader announcements derived
+ * from them. Usable headless, without the CommandPalette component.
  *
- * Four details carry the accessibility:
+ * Invariants that must not be broken:
  *
- * 1. The active element is tracked by a **stable path key**, not by an index. That
- *    way filtering changes the value of `aria-activedescendant` – which is exactly
- *    how a screen reader knows it must read again. With index-based ids the top
- *    match stays `option-0` forever, the value never changes and the announcement
- *    never happens. That is the bug present in almost every implementation.
- *
- * 2. Every state change remembers its **cause**. Arrow key navigation is announced
- *    reliably by `aria-activedescendant` – feeding a live region on top of that only
- *    produces double announcements. Typing, level and data changes on the other hand
- *    are announced unreliably and do get the live region.
- *
- * 3. Levels hold only their **path**, not the items themselves. That way the whole
- *    palette follows a changing `items` prop without any stale snapshot anywhere.
- *
- * 4. Search is **cross-level**: typing searches the entire subtree below the current
- *    level, keywords included. Every match carries its ancestors' path in the
- *    accessible name – without it, "Save" from two submenus would be
- *    indistinguishable to a screen reader user.
+ * - The active entry is tracked by path key, never by index. Filtering has to change
+ *   the value of `aria-activedescendant`, otherwise no re-announcement happens.
+ * - Every state change records its `cause`. `nav` and `pointer` stay silent because
+ *   `aria-activedescendant` already announces them; a live region on top would
+ *   double up.
+ * - Levels hold only their path, so the whole palette follows a changing `items`
+ *   prop with no stale snapshot.
  */
 export function useCommandPalette({ items, onClose, labels }) {
   const [stack, setStack] = useState([{ path: [], query: '', activeKey: null }])
@@ -110,15 +101,11 @@ export function useCommandPalette({ items, onClose, labels }) {
   // Defensive merge so the hook also works standalone with a partial object.
   const l = useMemo(() => ({ ...defaultLabels, ...labels }), [labels])
 
-  // Nothing is announced before the first real interaction: on open the screen
-  // reader reads dialog, input and active option by itself anyway.
-  // A ref rather than state so StrictMode double-mounts don't lift the block.
+  // Refs, not state, so StrictMode double-mounts don't reset them.
   const interactedRef = useRef(false)
   const prevItemsRef = useRef(items)
   const signatureRef = useRef(null)
 
-  // Resolve every level freshly from the current items. If a path breaks the chain
-  // ends there – the cleanup happens right below.
   const levels = useMemo(() => {
     const resolved = []
     for (const entry of stack) {
@@ -132,16 +119,15 @@ export function useCommandPalette({ items, onClose, labels }) {
   const level = levels[levels.length - 1]
   const canGoBack = levels.length > 1
 
-  // Submenu vanished from the data while the user was standing in it.
-  // Deliberately during render rather than in an effect: React discards the render
-  // and runs again immediately instead of first committing a frame with an invalid
-  // stack. Converges because the condition is false afterwards.
+  // Submenu vanished from the data while the user was standing in it. During render
+  // rather than in an effect, so no frame with an invalid stack is committed.
+  // Converges because the condition is false afterwards.
   if (levels.length < stack.length) {
     setStack((prev) => prev.slice(0, levels.length))
     setCause('pruned')
   }
 
-  // Without a search only the current level – otherwise the hierarchy would be gone
+  // Without a search only the current level, otherwise the hierarchy would be gone
   // the moment the palette opens.
   const browseEntries = useMemo(
     () => level.items.map((item) => ({ key: item.id, item, path: [item.id], trail: [], depth: 0 })),
@@ -157,8 +143,8 @@ export function useCommandPalette({ items, onClose, labels }) {
     [searching, searchEntries, browseEntries, level.query],
   )
 
-  // Falls back to the first match when `activeKey` is empty or filtered out. That is
-  // exactly why `setQuery` sets the key to `null`: typing jumps to the best match.
+  // Falls back to the first match when `activeKey` is empty or filtered out, which
+  // is why `setQuery` clears it: typing jumps to the best match.
   const activeIndex = useMemo(() => {
     if (results.length === 0) return -1
     const found = results.findIndex((result) => result.entry.key === level.activeKey)
@@ -208,8 +194,8 @@ export function useCommandPalette({ items, onClose, labels }) {
     [results, activeIndex, patchLevel],
   )
 
-  // `entry.path` is relative to the current level – for a search match from deeper
-  // down the palette therefore descends several levels at once.
+  // `entry.path` is relative to the current level, so a search match from deeper down
+  // descends several levels at once.
   const openSubmenu = useCallback((entry) => {
     interactedRef.current = true
     setCause('level')
@@ -223,8 +209,7 @@ export function useCommandPalette({ items, onClose, labels }) {
     ])
   }, [])
 
-  // Query and active element live per level in the stack – going back restores both
-  // instead of dropping the user at the top with no bearings.
+  // Query and active entry live per level, so going back restores both.
   const back = useCallback(() => {
     interactedRef.current = true
     setCause('level')
@@ -238,14 +223,13 @@ export function useCommandPalette({ items, onClose, labels }) {
         openSubmenu(entry)
         return
       }
-      // Do nothing without an action – otherwise a submenu that has become empty
-      // would silently close the whole palette on Enter.
+      // Without an action, do nothing — a submenu that has become empty must not
+      // silently close the palette on Enter.
       if (!entry.item.perform) return
 
       onClose()
-      // Close first, then run: `dialog.close()` returns focus to the opener. If the
-      // action ran synchronously before that, closing could take away a focus the
-      // action had just set.
+      // Close first: `dialog.close()` returns focus to the opener and would otherwise
+      // take away a focus the action had just set.
       setTimeout(() => entry.item.perform(entry.item), 0)
     },
     [onClose, openSubmenu],
@@ -267,10 +251,9 @@ export function useCommandPalette({ items, onClose, labels }) {
   }, [items])
 
   const announcement = useMemo(() => {
-    // Arrow keys and mouse carry themselves – see point 2 in the hook docs.
+    // Already carried by `aria-activedescendant`.
     if (cause === 'nav' || cause === 'pointer') return null
-    // The empty state is announced by the empty-state option via
-    // `aria-activedescendant`. Speaking here as well produces a double announcement.
+    // Carried by the empty-state option.
     if (results.length === 0) return null
 
     const count = l.itemCount(results.length)
@@ -283,7 +266,7 @@ export function useCommandPalette({ items, onClose, labels }) {
     return `${head}. ${describeEntry(activeEntry, l)}`
   }, [cause, results.length, activeEntry, level.label, l])
 
-  // What the user currently perceives: how many matches, and what Enter would run.
+  // What the user currently perceives: match count, and what Enter would run.
   const signature = `${results.length}|${activeEntry?.key ?? ''}`
 
   useEffect(() => {
@@ -292,26 +275,40 @@ export function useCommandPalette({ items, onClose, labels }) {
     }
 
     if (!announcement) {
-      // Arrow key/mouse: discard a pending typing announcement so it doesn't arrive
-      // late and out of date.
+      // Drop a pending typing announcement so it doesn't arrive late and out of date.
       cancelAnnouncement()
       remember()
       return
     }
 
-    // Stay silent on open – the dialog handles that itself.
+    // Silent on open — the dialog announces itself.
     if (!interactedRef.current && cause !== 'items' && cause !== 'pruned') {
       remember()
       return
     }
 
-    // Only announce external changes when something actually changed for the user.
-    // Otherwise a list refreshing every second talks non-stop.
+    // External changes only when something actually changed, otherwise a list
+    // refreshing every second talks non-stop.
     if (cause === 'items' && signature === signatureRef.current) return
 
     remember()
     announce(announcement, { delay: ANNOUNCE_DELAY[cause] ?? 0 })
   }, [announcement, cause, signature, announce, cancelAnnouncement])
+
+  // Always the root text — the stack starts empty on every mount. A string, so an
+  // unstable `labels` object cannot retrigger the effect below.
+  const introduction = l.footerRoot
+
+  // The keyboard help, spoken once per session after the dialog has announced itself.
+  // Must stay below the effect above: on open that one runs first and may cancel a
+  // pending announcement, which would swallow this one.
+  //
+  // Any real interaction inside the delay wins, because every announcement shares one
+  // timer — arrowing or typing right after opening discards the help instead of talking
+  // over the user.
+  useEffect(() => {
+    announce(introduction, { delay: INTRO_DELAY })
+  }, [announce, introduction])
 
   return {
     level,

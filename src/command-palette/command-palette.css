@@ -1,17 +1,13 @@
-/* Theming works through `--cp-*` custom properties, each with a literal fallback.
- * The palette looks right out of the box – and adopts the host theme as soon as
- * it maps its own tokens:
+/* Theming runs through `--cp-*` custom properties, each with a literal fallback:
  *
  *   :root {
  *     --cp-bg: var(--my-surface);
  *     --cp-accent: var(--my-brand);
  *   }
- *
- * Deliberately not reading generic names like `--bg` directly: in a host project
- * those usually mean something else. */
+ */
 
-/* Standard technique: taken out of the layout but kept in the accessibility tree.
-   `display: none` or `visibility: hidden` would mute the live regions. */
+/* Out of the layout, kept in the accessibility tree. `display: none` or
+   `visibility: hidden` would mute the live regions. */
 .cp-sr-only {
   position: absolute;
   width: 1px;
@@ -24,19 +20,13 @@
   border: 0;
 }
 
-/* Full-screen overlay. The backdrop-filter is applied directly to the <dialog>
-   element instead of ::backdrop so that it works in all browsers, including
-   Firefox which only gained backdrop-filter on ::backdrop in v122 and still has
-   gaps in some builds. Clicks on the transparent area outside the panel reach
-   the dialog element itself and are handled by the onClick guard in JSX.
+/* Full-screen overlay. The blur sits on the <dialog> rather than ::backdrop, which
+   Firefox only supports from v122 and still with gaps. Clicks on the transparent
+   area reach the dialog element and are handled by the onClick guard in JSX.
 
-   Closed state – and the *exit* timing. A transition is governed by the rule for
-   the state the element moves into, so leaving is defined here and entering on
-   `[open]`. That is what lets the two have different curves.
-
-   Exits are short and accelerate away (ease-in): a UI that lingers on dismissal
-   feels sluggish. `display` and `overlay` need `allow-discrete`, otherwise the
-   browser flips them instantly and there is nothing left to animate. */
+   This rule also holds the exit timing: a transition is governed by the rule for the
+   state the element moves into, so leaving is defined here and entering on `[open]`.
+   `display` and `overlay` need `allow-discrete` to animate at all. */
 .cp-dialog {
   box-sizing: border-box;
   position: fixed;
@@ -61,11 +51,7 @@
     overlay 150ms allow-discrete;
 }
 
-/* Only while open, otherwise `display` overrides the browser's `display: none` and
-   the dialog sits in the layout permanently.
-
-   Entering is slower and settles rather than stopping: the steep ease-out spends
-   most of the time near the end, which is what reads as fluid. */
+/* Scoped to [open], otherwise `display` overrides the browser's `display: none`. */
 .cp-dialog[open] {
   display: flex;
   flex-direction: column;
@@ -77,16 +63,16 @@
     overlay 200ms allow-discrete;
 }
 
-/* Without a declared starting point there is nothing to animate *from* when the
-   element enters the top layer. Browsers without support simply show it at once. */
+/* Without a declared starting point there is nothing to animate from when the
+   element enters the top layer. Unsupported browsers show it at once. */
 @starting-style {
   .cp-dialog[open] {
     opacity: 0;
   }
 }
 
-/* The native ::backdrop is still created by showModal() but is no longer needed
-   for the blur – keep it transparent so it does not double-up the tint. */
+/* showModal() still creates the native backdrop; keep it transparent so it does not
+   double up the tint. */
 .cp-dialog::backdrop {
   background: transparent;
 }
@@ -97,8 +83,6 @@
   }
 }
 
-/* Some users switch off translucency at the OS level – honour that and fall back to
-   an opaque scrim instead of blur. */
 @media (prefers-reduced-transparency: reduce) {
   .cp-dialog {
     backdrop-filter: none;
@@ -113,8 +97,7 @@
   }
 }
 
-/* The visible panel box. Previously the <dialog> itself was sized as the panel;
-   now it is a child so that the dialog can be full-screen. */
+/* The visible panel box, a child of the dialog so the dialog can be full-screen. */
 .cp-panel {
   box-sizing: border-box;
   flex: 0 1 auto;
@@ -133,13 +116,11 @@
   );
   overflow: hidden;
 
-  /* Internal layout */
   display: flex;
   flex-direction: column;
   min-height: 0;
   text-align: start;
 
-  /* Closed state / exit animation for the panel box itself. */
   scale: 0.97;
   translate: 0 -10px;
   transition:
@@ -191,7 +172,6 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  /* Don't chain past the end of the list into the page behind. */
   overscroll-behavior: contain;
   padding: 6px;
 }
@@ -205,14 +185,11 @@
   cursor: default;
 }
 
-/* Level changes only. React gives every row a fresh DOM node when the level changes
-   (the keys are path based), so the animation restarts on its own – even on two
-   submenu entries in a row. While typing the class is absent, so filtering does not
-   twitch on every keystroke.
+/* Level changes only. React hands every row a fresh DOM node when the level changes,
+   so the animation restarts on its own. While typing the class is absent.
 
-   Deliberately no animation on the listbox itself: it carries the option ids and
-   `aria-activedescendant`, and rebuilding that node would put the announcements at
-   risk for the sake of decoration. */
+   Not on the listbox itself: it carries the option ids and `aria-activedescendant`,
+   and rebuilding that node would risk the announcements. */
 @keyframes cp-option-in {
   from {
     opacity: 0;
@@ -220,17 +197,14 @@
   }
 }
 
-/* `backwards` is not optional: the rows carry a staggered `animation-delay`, and
-   without it they would sit fully visible during the delay and then snap to
-   transparent when the animation starts. The stagger is capped in JS so a long list
-   does not cascade for half a second. */
+/* `backwards` is required: the rows carry a staggered `animation-delay` and would
+   otherwise sit visible during it, then snap to transparent. */
 .cp-option--enter {
   animation: cp-option-in 190ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
-/* The active option is not focused (focus stays in the input), so it needs its own
-   clearly visible marking. A border rather than background alone, so it stays
-   recognisable in high contrast mode. */
+/* The active option is not focused, so it needs its own marking. Border rather than
+   background alone, so it survives high contrast mode. */
 .cp-option--active {
   background: var(--cp-accent-bg, rgb(170 59 255 / 10%));
   box-shadow: inset 0 0 0 2px var(--cp-accent-border, rgb(170 59 255 / 50%));
@@ -241,8 +215,7 @@
   opacity: 0.45;
 }
 
-/* Fixed slot so labels line up whether or not an entry has an icon.
-   `currentColor` inside the SVG makes it follow the theme and the active state. */
+/* Fixed slot so labels line up whether or not an entry has an icon. */
 .cp-option__icon {
   display: grid;
   flex: 0 0 auto;
@@ -310,9 +283,6 @@
   text-align: center;
 }
 
-/* Replaces the former sr-only help referenced via aria-describedby: that got read
-   out on every re-announcement of the input. Visible in the panel it bothers
-   nobody and stays discoverable for screen reader users. */
 .cp-footer {
   flex: 0 0 auto;
   padding: 8px 16px;
@@ -327,8 +297,7 @@
   }
 }
 
-/* Everything above is decoration – switching it off leaves the palette fully usable,
-   it just appears and disappears instantly. */
+/* All of the above is decoration — without it the palette just appears instantly. */
 @media (prefers-reduced-motion: reduce) {
   .cp-dialog,
   .cp-panel {

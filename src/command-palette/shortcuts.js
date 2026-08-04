@@ -1,16 +1,11 @@
 /**
- * A shortcut is modelled as a token array (`['Mod', 'K']`) and translated into three
- * separate representations:
+ * Shortcuts are token arrays (`['Mod', 'K']`) rendered three ways:
  *
- *  - `shortcutGlyphs`  – visible, compact, symbolic (`⌘K`). Useless to a screen
- *                        reader, so it is always `aria-hidden` in the markup.
- *  - `shortcutSpeech`  – spelled out ("Ctrl plus K"). This is the version that
- *                        actually gets announced.
- *  - `shortcutAria`    – canonical ARIA tokens ("Control+K") for `aria-keyshortcuts`.
- *                        Semantically correct, but screen reader support is patchy –
- *                        so it supplements the information rather than carrying it.
+ *  - `shortcutGlyphs`  visible and symbolic (`⌘K`), always `aria-hidden`
+ *  - `shortcutSpeech`  spelled out ("Control plus K"), this is what gets announced
+ *  - `shortcutAria`    ARIA tokens ("Control+K") for `aria-keyshortcuts`
  *
- * `Mod` stands for the platform's command key (⌘ on macOS, Ctrl elsewhere).
+ * `Mod` is the platform's command key: ⌘ on macOS, Ctrl elsewhere.
  */
 
 function detectMac() {
@@ -80,14 +75,14 @@ export function shortcutGlyphs(tokens, overrides = {}) {
  * @param {string[]} tokens
  * @param {Record<string, string>} [overrides] from `labels.keys`
  * @param {string} [joiner] from `labels.keyJoiner`
- * @returns {string} e.g. `Control plus K` – spelled out so nothing gets swallowed.
+ * @returns {string} e.g. `Control plus K`
  */
 export function shortcutSpeech(tokens, overrides = {}, joiner = ' plus ') {
   return tokens.map((token) => overrides[token] ?? SPEECH[token] ?? token).join(joiner)
 }
 
 /**
- * Never localized – these are ARIA specification tokens, not display text.
+ * Never localized — ARIA specification tokens, not display text.
  *
  * @returns {string} e.g. `Control+K` for `aria-keyshortcuts`
  */

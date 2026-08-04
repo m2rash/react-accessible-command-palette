@@ -1,25 +1,18 @@
 /**
  * Fuzzy matching for the CommandPalette.
  *
- * Deliberately hand-written instead of fuse.js/uFuzzy: we need the match positions
- * for highlighting and matching against alias `keywords`, and command palettes hold
- * so few entries that performance is irrelevant.
- *
- * The score comes from a dynamic-programming alignment (optimal, not greedy):
- * dp[i][j] = best score when query[i] lands on text[j]. A running maximum keeps
- * this at O(query * text).
+ * Scored with a dynamic-programming alignment rather than a greedy scan:
+ * dp[i][j] = best score when query[i] lands on text[j]. O(query * text).
  */
 
-const BASE = 16 // base value per matched character
+const BASE = 16 // per matched character
 const BONUS_BOUNDARY = 8 // match at the start of a word
 const BONUS_CAMEL = 6 // match on a camelCase hump
 const BONUS_CONSECUTIVE = 8 // match directly after the previous one
 const GAP_START = 3 // penalty for opening a gap
 const GAP_EXTEND = 1 // penalty per further skipped character
 const KEYWORD_PENALTY = 12 // alias matches count for less than label matches
-// Capped so long labels don't lose on length alone: otherwise a scattered "S…u" in
-// "Save As" would beat the clean "su" in "Search".
-const MAX_LEADING_PENALTY = 6
+const MAX_LEADING_PENALTY = 6 // capped, so long labels don't lose on length alone
 
 const NEG = -Infinity
 const SEPARATORS = ' \t-_/.:\\()[]'
@@ -79,7 +72,6 @@ export function fuzzyScore(text, query) {
     from.push(new Int32Array(n).fill(-1))
   }
 
-  // First character: the further back the match, the worse — but capped.
   for (let j = 0; j <= n - m; j++) {
     if (lowerText[j] === lowerQuery[0]) {
       dp[0][j] = BASE + bonus[j] - Math.min(j, MAX_LEADING_PENALTY) * GAP_EXTEND
@@ -87,8 +79,8 @@ export function fuzzyScore(text, query) {
   }
 
   for (let i = 1; i < m; i++) {
-    // gapMax = max over k <= j-2 of (dp[i-1][k] - gap cost up to j).
-    // Decayed by GAP_EXTEND per step instead of re-checking every k.
+    // gapMax = max over k <= j-2 of (dp[i-1][k] - gap cost up to j), decayed by
+    // GAP_EXTEND per step instead of re-checking every k.
     let gapMax = NEG
     let gapIdx = -1
 
@@ -113,7 +105,6 @@ export function fuzzyScore(text, query) {
         }
       }
 
-      // Carry gapMax forward to the next column.
       const candidate = dp[i - 1][j - 1]
       if (gapMax === NEG) {
         if (candidate !== NEG) {
@@ -153,8 +144,7 @@ export function fuzzyScore(text, query) {
  * Filters and sorts entries. An empty query keeps the original order.
  *
  * @param {Array<{item: object, depth: number}>} entries flat list, see `flatten` in
- *   useCommandPalette – with cross-level search this also holds entries from deeper
- *   levels.
+ *   useCommandPalette.
  * @returns {Array<{entry: object, score: number, ranges: Array<[number, number]>, index: number}>}
  */
 export function filterItems(entries, query) {
@@ -182,8 +172,7 @@ export function filterItems(entries, query) {
     }
   })
 
-  // Ties: shallower entries first, then original order. Without stable secondary
-  // criteria the list jumps around while typing.
+  // Stable secondary criteria, otherwise the list jumps around while typing.
   matches.sort(
     (a, b) => b.score - a.score || a.entry.depth - b.entry.depth || a.index - b.index,
   )

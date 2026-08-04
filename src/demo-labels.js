@@ -12,6 +12,7 @@
  */
 export const germanLabels = {
   dialog: 'Befehlspalette',
+  dialogDescription: 'Suchfeld fokussiert. Tippen filtert die Liste.',
   placeholder: 'Befehl suchen…',
   root: 'Alle Befehle',
   searchAll: 'Befehl suchen',

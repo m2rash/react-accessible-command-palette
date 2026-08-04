@@ -8,22 +8,21 @@ function isModK(event) {
 }
 
 /**
- * Optional convenience wrapper: owns the open/closed state, registers the global
- * shortcut and renders the palette once at the root. Any component below can then
- * open it through `useCommandPaletteActions()` – no prop drilling.
+ * Owns the open state, registers the global shortcut and renders the palette once at
+ * the root. Components below open it through `useCommandPaletteActions()`.
  *
- * `CommandPalette` itself stays fully controlled and can be used without this.
+ * Optional — `CommandPalette` stays fully controlled and works without this.
  *
  * @param {object} props
  * @param {Array}  props.items  see the item model in `demo-commands.jsx`
  * @param {object} [props.labels]
- * @param {(event: KeyboardEvent) => boolean} [props.shortcut] decides which key
- *   combination opens the palette. Pass a stable function.
+ * @param {(event: KeyboardEvent) => boolean} [props.shortcut] which combination
+ *   toggles the palette. Pass a stable function.
  */
 export function CommandPaletteProvider({ items, labels, shortcut = isModK, children }) {
   const [open, setOpen] = useState(false)
 
-  // Stable identity – consumers of ActionsContext don't re-render when the palette opens or closes.
+  // Stable identity — see paletteContext.
   const actions = useMemo(
     () => ({
       open: () => setOpen(true),
@@ -35,12 +34,12 @@ export function CommandPaletteProvider({ items, labels, shortcut = isModK, child
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      // Respect a handler that already claimed this key combination.
+      // Respect a handler that already claimed this combination.
       if (event.defaultPrevented) return
       if (!shortcut(event)) return
       event.preventDefault()
-      // Toggles: the same combination closes the palette again. The listener sits on
-      // `window`, so it also fires while focus is inside the palette's input.
+      // Toggles. The listener sits on `window`, so it also fires while focus is
+      // inside the palette's input.
       setOpen((current) => !current)
     }
 
@@ -52,9 +51,6 @@ export function CommandPaletteProvider({ items, labels, shortcut = isModK, child
     <ActionsContext.Provider value={actions}>
       <OpenContext.Provider value={open}>
         {children}
-        {/* Rendered as a sibling of the app, not inside it: the native <dialog>
-            lives in the top layer anyway, and this keeps it out of any transformed
-            or overflow-clipped ancestor. */}
         <CommandPalette open={open} onClose={actions.close} items={items} labels={labels} />
       </OpenContext.Provider>
     </ActionsContext.Provider>

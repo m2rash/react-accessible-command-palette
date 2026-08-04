@@ -1,22 +1,12 @@
 import { createContext, useContext } from 'react'
 
-/**
- * Two contexts on purpose, not one.
- *
- * Almost every consumer only wants to *open* the palette. `ActionsContext` holds a
- * value that never changes, so those components do not re-render when the palette
- * opens or closes. Only the few that actually need to know the state subscribe to
- * `OpenContext` and pay for it.
- *
- * Merging both into one object would re-render every button in the app on each open.
- */
+// Split in two: `ActionsContext` never changes value, so components that only open
+// the palette do not re-render when it opens or closes. Only subscribers of
+// `OpenContext` pay for that.
 export const ActionsContext = createContext(null)
 export const OpenContext = createContext(false)
 
-/**
- * `{ open, close, toggle }` – stable across renders, safe to use in dependency
- * arrays and event handlers.
- */
+/** `{ open, close, toggle }` — stable across renders, safe in dependency arrays. */
 export function useCommandPaletteActions() {
   const actions = useContext(ActionsContext)
   if (!actions) {

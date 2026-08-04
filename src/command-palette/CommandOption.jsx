@@ -5,9 +5,8 @@ import { childCount, hasChildren } from './useCommandPalette'
 /**
  * Highlights the fuzzy matches.
  *
- * Deliberately `<span>` rather than `<mark>`: VoiceOver announces highlights with
- * "highlight start/end" – on every other letter of a search match that renders the
- * announcement unusable.
+ * `<span>` rather than `<mark>`: VoiceOver announces highlights with "highlight
+ * start/end", which is unusable on every other letter of a match.
  */
 function Highlighted({ text, ranges }) {
   if (ranges.length === 0) return text
@@ -34,10 +33,9 @@ function Highlighted({ text, ranges }) {
 /**
  * A single option in the list.
  *
- * The accessible name of a `role="option"` is computed from its content – so
- * **DOM order is speaking order**. Label, shortcut text and submenu hint therefore
- * appear here in the order they should be read; the visual arrangement (shortcut
- * right-aligned) is left entirely to CSS.
+ * The accessible name of a `role="option"` is computed from its content, so DOM
+ * order is speaking order. Label, trail, shortcut and submenu hint appear in the
+ * order they should be read; the visual arrangement is left to CSS.
  */
 export function CommandOption({
   entry,
@@ -65,22 +63,18 @@ export function CommandOption({
       role="option"
       aria-selected={isActive}
       aria-disabled={item.disabled || undefined}
-      // Semantically correct, but screen reader support is patchy – the actual
-      // announcement is carried by the sr-only text below.
+      // Supplementary — support is patchy, the sr-only text below carries it.
       aria-keyshortcuts={item.shortcut ? shortcutAria(item.shortcut) : undefined}
       className={`cp-option${isActive ? ' cp-option--active' : ''}${item.disabled ? ' cp-option--disabled' : ''}${animateIn ? ' cp-option--enter' : ''}`}
-      // Capped at 8 rows: beyond that the cascade would outlast the animation itself
-      // and the list would feel slower, not smoother.
+      // Capped at 8 rows, beyond that the cascade outlasts the animation itself.
       style={animateIn ? { animationDelay: `${Math.min(enterIndex, 8) * 10}ms` } : undefined}
-      // `pointermove` rather than `mouseenter`: fires only on real pointer movement.
-      // Otherwise a re-render under a stationary pointer hijacks the selection.
+      // `pointermove` rather than `mouseenter`, so a re-render under a stationary
+      // pointer does not hijack the selection.
       onPointerMove={() => onPointerMove(entry.key)}
       onClick={() => onActivate(entry)}
     >
-      {/* Always `aria-hidden`: the label already carries the meaning, so an icon
-          contributing to the accessible name would only duplicate or muddy the
-          announcement. The empty span keeps labels aligned when only some entries
-          in the list have an icon. */}
+      {/* Always `aria-hidden` — the label carries the meaning. The empty span keeps
+          labels aligned when only some entries have an icon. */}
       {(item.icon || reserveIcon) && (
         <span className="cp-option__icon" aria-hidden="true">
           {item.icon}
@@ -92,9 +86,8 @@ export function CommandOption({
           <Highlighted text={item.label} ranges={ranges} />
         </span>
 
-        {/* Origin of a cross-level match. Without it, two commands with the same
-            label from different submenus would be indistinguishable – visually as
-            well as to a screen reader. */}
+        {/* Origin of a cross-level match, without which two identically labelled
+            commands from different submenus are indistinguishable. */}
         {trail.length > 0 && (
           <>
             <span className="cp-sr-only">, {labels.inTrail(trail)}</span>

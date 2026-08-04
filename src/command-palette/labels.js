@@ -2,22 +2,20 @@
  * Every user-facing string of the palette. Pass a partial object as the `labels`
  * prop; it is shallow-merged over these defaults.
  *
- * Anything that depends on a value or a count is a **function, not a string**. That
- * is deliberate: English and German have two plural forms, Polish and Arabic have
- * more, and a fixed `{one, many}` shape would wall you in. It also lets you call
- * `t()` from i18next or react-intl directly inside, instead of maintaining a second
- * translation layer.
+ * Anything depending on a value or a count is a function, so plural rules stay with
+ * the caller and `t()` from i18next or react-intl can be called inside.
  *
- * Pass a stable object (module constant or `useMemo`) – a fresh object on every
- * render invalidates the memoisation downstream.
+ * Pass a stable object (module constant or `useMemo`) — a fresh one per render
+ * invalidates the memoisation downstream.
  *
- * Note what is **not** in here: `shortcutAria` produces `"Control+N"` for
- * `aria-keyshortcuts`. Those are specification tokens, not display text —
- * translating them would break the attribute.
+ * Not included: `shortcutAria` produces `"Control+N"` for `aria-keyshortcuts`. Those
+ * are specification tokens, not display text.
  */
 export const defaultLabels = {
   // Dialog and input
   dialog: 'Command palette',
+  /** Read once via the dialog's `aria-describedby`. Keep it short. */
+  dialogDescription: 'Search field focused. Type to filter the list.',
   placeholder: 'Search commands…',
   /** Name of the root level, shown in the breadcrumb and announcements. */
   root: 'All commands',
@@ -32,13 +30,13 @@ export const defaultLabels = {
 
   empty: (query) => `No results for “${query}”`,
 
+  /** Visible below the list and, on open, spoken last by screen reader. Keep it short enough to hear. */
   footerRoot:
     'Type anytime to search all commands including submenus. Arrow keys navigate, Enter runs or opens a submenu. Escape closes.',
   footerSubmenu:
     'Type anytime to search this submenu and everything below it. Arrow keys navigate, Enter runs. Backspace in an empty search field goes back one level, Escape closes.',
 
-  // Parts of an entry's accessible name. The separating ", " is added by the caller,
-  // so these stay readable on their own.
+  // Parts of an entry's accessible name. The separating ", " is added by the caller.
   inTrail: (trail) => `in ${trail.join(', ')}`,
   shortcut: (speech) => `keyboard shortcut ${speech}`,
   submenu: (count) => `submenu, ${count} ${count === 1 ? 'item' : 'items'}`,
@@ -51,15 +49,13 @@ export const defaultLabels = {
   submenuGone: (level, count) => `Submenu no longer available. ${level}, ${count}`,
 
   /**
-   * Spoken names of shortcut tokens, merged over the built-in table in shortcuts.js.
-   * Example: `{ Mod: 'Strg', Shift: 'Umschalt' }`.
-   *
-   * Flat, so it cannot distinguish platforms – on macOS `Mod` should usually speak
-   * as "Command". If you need both, branch on the platform when you build the object.
+   * Spoken names of shortcut tokens, merged over the table in shortcuts.js.
+   * Example: `{ Mod: 'Strg', Shift: 'Umschalt' }`. Flat, so it cannot distinguish
+   * platforms — branch when building the object if you need macOS wording too.
    */
   keys: {},
   /** Visible glyphs, same merge. Example: `{ Escape: 'Esc', Delete: 'Entf' }`. */
   keyGlyphs: {},
-  /** Joins the tokens when spoken – language dependent. */
+  /** Joins the tokens when spoken. */
   keyJoiner: ' plus ',
 }
